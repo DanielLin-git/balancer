@@ -1,3 +1,4 @@
+import numpy as np
 import cv2
 from flask import Flask, Response, render_template_string
 from picamera2 import Picamera2
@@ -17,16 +18,21 @@ def gen_frames():
             break
         
         # 色彩空間轉換 (RGB 轉 BGR 給 OpenCV 辨識用)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        lower = np.array([10, 100, 100])
+        upper = np.array([40, 255, 255])
 
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        HSV_image = cv2.cvtColor(frame_bgr, cv2.COLOR_RGB2HSV)
+        mask = cv2.inRange(HSV_image , lower, upper)
+        result = cv2.bitwise_and(frame, frame, mask=mask)
         # ==========================================
         # 在這裡加入你的 OpenCV 影像辨識與處理邏輯
-        cv2.putText(frame, "CSI Camera OK!", (30, 30),
+        cv2.putText(result, "CSI Camera OK!", (30, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         # ==========================================
 
         # 編碼為 JPEG
-        ret, buffer = cv2.imencode('.jpg', frame)
+        ret, buffer = cv2.imencode('.jpg', result)
         frame_bytes = buffer.tobytes()
         
         yield (b'--frame\r\n'
