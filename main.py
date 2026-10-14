@@ -50,22 +50,14 @@ def process_frames():
         result, ball = vision.recognition(frame)
 
         if ball is not None and dt > 0:
-            control_output = controller.update(ball, dt)
 
-            if control_output is not None:
-                # 暫時保留安全的測試值。
-                # 後續再將 control_output 映射到三顆馬達。
-                pwm1, pwm2, pwm3 = 1600, 1600, 1600
-
-                uart.send_servo_command(1, pwm1)
-                uart.send_servo_command(2, pwm2)
-                uart.send_servo_command(3, pwm3)
-
-                logging.info(
-                    "Ball x=%.2f y=%.2f vx=%.2f vy=%.2f",
-                    ball["x"], ball["y"],
-                    ball["vx"], ball["vy"]
-                )
+            controller.update(ball, dt, uart)
+            
+            logging.info(
+                "Ball x=%.2f y=%.2f vx=%.2f vy=%.2f",
+                ball["x"], ball["y"],
+                ball["vx"], ball["vy"]
+            )
 
 
         web_stream.update_frame(result)
@@ -74,6 +66,7 @@ def process_frames():
 def main():
     camera.camera_setup()
     uart.uart_setup()
+    
 
     worker = threading.Thread(
         target=process_frames,
@@ -81,9 +74,12 @@ def main():
     )
     worker.start()
 
+    controller.motor_start(uart)
+
     try:
         web_stream.run()
     finally:
+        controller.motor_reset(uart)
         stop_event.set()
         worker.join(timeout=2.0)
         camera.close()
