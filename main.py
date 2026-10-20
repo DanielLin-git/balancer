@@ -1,8 +1,6 @@
-
 import time
 import threading
 import logging
-
 import cv2
 
 
@@ -51,12 +49,17 @@ def process_frames():
 
         if ball is not None and dt > 0:
 
-            controller.update(ball, dt, uart)
+            error_x, error_y, output_x, output_y, theta, phi, motor_angles = controller.update(ball, dt, uart)
             
             logging.info(
-                "Ball x=%.2f y=%.2f vx=%.2f vy=%.2f",
+                "Ball x=%.2f y=%.2f vx=%.2f vy=%.2f radius=%.2f error_x =%.2f error_y=%.2f output_x=%.2f output_y=%.2f theta=%.2f phi=%.2f motor_angles1=%.2f motor_angles2=%.2f motor_angles3=%.2f",
                 ball["x"], ball["y"],
-                ball["vx"], ball["vy"]
+                ball["vx"], ball["vy"],
+                ball["radius"],
+                error_x, error_y, 
+                output_x, output_y,
+                theta, phi,
+                motor_angles[0],motor_angles[1],motor_angles[2]
             )
 
 
@@ -64,6 +67,8 @@ def process_frames():
 
 
 def main():
+
+
     camera.camera_setup()
     uart.uart_setup()
     
@@ -76,6 +81,7 @@ def main():
 
     controller.motor_start(uart)
 
+    
     try:
         web_stream.run()
     finally:
@@ -84,7 +90,7 @@ def main():
         worker.join(timeout=2.0)
         camera.close()
         uart.close()
-
+    
 
 if __name__ == "__main__":
     main()

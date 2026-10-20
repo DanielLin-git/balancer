@@ -74,13 +74,14 @@ class VISION():
 
                     v_x = dx / dt * scale
                     v_y =  dy / dt * scale 
+                    radius_mm = radius *scale
 
                     ball = {
-                        "x": x - frame.shape[1] / 2,
-                        "y": frame.shape[0] / 2 - y,
+                        "x": (x - frame.shape[1] / 2)*scale,
+                        "y": (frame.shape[0] / 2 - y)*scale,
                         "vx": v_x,
                         "vy": v_y,
-                        "radius": radius,
+                        "radius": radius_mm,
                     }
 
                     cv2.circle(
