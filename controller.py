@@ -11,14 +11,14 @@ class CONTROLLER:
         self.L3 = 90.0   # 圓心到連桿二上方魚眼的距離 (頂板連接半徑)
         
 
-        self.pz_ini = 99.89
+        self.pz_ini = 112.47
 
 
         self.target_x = 0.0
         self.target_y = 0.0
         
 
-        self.kp = 0.05
+        self.kp = 0.03
         self.ki = 0.0
         self.kd = 0.003
 
@@ -30,17 +30,17 @@ class CONTROLLER:
         self.pwm_max = 2000
 
     def motor_reset(self, uart: UART):
-        self.send_angle_to_motor(uart, 1, 180)
-        self.send_angle_to_motor(uart, 2, 180)
-        self.send_angle_to_motor(uart, 3, 180)
+        self.send_angle_to_motor(uart, 1, 150)
+        self.send_angle_to_motor(uart, 2, 150)
+        self.send_angle_to_motor(uart, 3, 150)
 
 
 
     def motor_start(self, uart: UART):
         
-        self.send_angle_to_motor(uart, 1, 180)
-        self.send_angle_to_motor(uart, 2, 180)
-        self.send_angle_to_motor(uart, 3, 180)
+        self.send_angle_to_motor(uart, 1, 150)
+        self.send_angle_to_motor(uart, 2, 150)
+        self.send_angle_to_motor(uart, 3, 150)
 
 
     def angle_to_pwm(self, angle_deg: float) -> int:
@@ -53,13 +53,15 @@ class CONTROLLER:
 
         pwm = self.angle_to_pwm(angle_deg)
         uart.send_servo_command(servo_id, pwm)
+    
 
+    """
     def kinema_inv(self, theta, phi, pz):
-        """
+        
         Inverse kinematics for a 3-actuator, 2-link platform.
 
         Parameters
-        ----------
+        
         theta : float
             Platform tilt about x-axis, in radians.
         phi : float
@@ -68,14 +70,11 @@ class CONTROLLER:
             Platform center height, in mm.
 
         Returns
-        -------
+        
         tuple
             (servo1, servo2, servo3), in degrees.
+        
 
-        Servo angle convention:
-            180 deg = horizontal, pointing inward
-            90 deg = vertical, pointing upward
-        """
 
         motor_positions = [270.0, 30.0, 150.0]
 
@@ -179,13 +178,128 @@ class CONTROLLER:
                 )
 
 
-            """
             if not angle_min <= solution <= angle_max:
                 raise ValueError("Servo angle outside safe range.")
-            """
+
             solutions.append(solution)
 
         return tuple(solutions)
+    """
+
+    def kinema_inv(self, theta, phi, pz):
+
+
+        l0 = self.L0
+        l1 = self.L1
+        l2 = self.L2
+        l3 = self.L3
+
+        # 三顆馬達的方位角，採世界座標逆時針為正
+        alphas = [
+            math.radians(270.0),
+            math.radians(30.0),
+            math.radians(150.0),
+        ]
+
+        # Roll 與 Pitch 的三角函數
+        ct = math.cos(theta)
+        st = math.sin(theta)
+        cp = math.cos(phi)
+        sp = math.sin(phi)
+
+        # R = Rx(theta) @ Ry(phi)
+        R = [
+            [cp,       0.0,  sp],
+            [st * sp,  ct,  -st * cp],
+            [-ct * sp, st,   ct * cp],
+        ]
+
+        # 平台中心
+        P = [0.0, 0.0, pz]
+
+        motor_angles = []
+
+        for alpha in alphas:
+
+            ca = math.cos(alpha)
+            sa = math.sin(alpha)
+
+            # 上平台接點在平台局部座標系中的位置
+            r = [
+                l3 * ca,
+                l3 * sa,
+                0.0,
+            ]
+
+            # C = P + R @ r
+            C = [
+                P[j] + sum(R[j][k] * r[k] for k in range(3))
+                for j in range(3)
+            ]
+
+            # 轉換到馬達的徑向、切向、垂直座標
+            Cr = C[0] * ca + C[1] * sa
+            Ct = -C[0] * sa + C[1] * ca
+            Cz = C[2]
+
+            d = Cr - l0
+
+            # d*cos(q) - Cz*sin(q) = K
+            K = (
+                l2**2 - d**2 - Ct**2 - Cz**2 - l1**2
+            ) / (2.0 * l1)
+
+            rho = math.hypot(d, Cz)
+
+            # 檢查是否存在實數解
+            if rho < 1e-9:
+                return None
+
+            ratio = K / rho
+
+            if abs(ratio) > 1.0 + 1e-9:
+                return None
+
+            # 避免浮點誤差使 acos 超出定義域
+            ratio = max(-1.0, min(1.0, ratio))
+
+            gamma = math.acos(ratio)
+            beta = math.atan2(Cz, d)
+
+            # 產生不同分支及其等價角度
+            candidates = []
+
+            for sign in (1.0, -1.0):
+                base = sign * gamma - beta
+
+                for k in range(-2, 3):
+                    q = base + 2.0 * math.pi * k
+
+                    if -1e-9 <= q <= math.pi + 1e-9:
+                        candidates.append(
+                            max(0.0, min(math.pi, q))
+                        )
+            """
+            print(
+                f"alpha={math.degrees(alpha):.1f}, "
+                f"Cr={Cr:.4f}, Ct={Ct:.4f}, Cz={Cz:.4f}, "
+                f"d={d:.4f}, K={K:.4f}, rho={rho:.4f}, "
+                f"ratio={ratio:.6f}, "
+                f"candidates={[round(math.degrees(q), 4) for q in candidates]}"
+            )
+            """
+            if not candidates:
+                return None
+
+            # 優先選擇最接近水平朝外的 180 度解
+            q = min(
+                candidates,
+                key=lambda x: abs(x - math.pi)
+            )
+
+            motor_angles.append(math.degrees(q))
+
+        return motor_angles
 
     def update(self, ball, dt, uart: UART):
 
@@ -210,27 +324,21 @@ class CONTROLLER:
         output_x = self.kp * error_x + self.ki * self.integral_x - self.kd * derivative_x
         output_y = self.kp * error_y + self.ki * self.integral_y - self.kd * derivative_y
 
-        tilt_gain_x = 0.015
-        tilt_gain_y = 0.015
+        tilt_gain_x = 0.05
+        tilt_gain_y = 0.05
 
         theta = -output_y * tilt_gain_x
         phi = output_x * tilt_gain_y
 
-        try:
-            motor_angles = self.kinema_inv(
-                theta, phi, self.pz_ini
-            )
-
-            for servo_id, angle in enumerate(motor_angles, start=1):
-                self.send_angle_to_motor(
-                    uart, servo_id, angle
-                )
-
-        except ValueError as e:
-            logging.warning("IK failed: %s", e)
-
-
-
+        if theta >=0.08:
+            theta =0.08
+        elif theta<=-0.08:
+            theta = -0.08
+        
+        if phi >=0.08:
+            phi =0.08
+        elif phi<=-0.08:
+            phi = -0.08
 
         motor_angles = self.kinema_inv(theta, phi, self.pz_ini)
         

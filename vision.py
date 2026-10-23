@@ -61,7 +61,7 @@ class VISION():
                 ((x, y), radius) = cv2.minEnclosingCircle(c)
 
                 center = (int(x), int(y))
-                radius = int(radius)
+                radius = float(radius)
 
                 v_x = 0.0
                 v_y = 0.0
@@ -82,6 +82,7 @@ class VISION():
                         "vx": v_x,
                         "vy": v_y,
                         "radius": radius_mm,
+                        "scale":scale
                     }
 
                     cv2.circle(

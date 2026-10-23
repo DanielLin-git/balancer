@@ -52,10 +52,11 @@ def process_frames():
             error_x, error_y, output_x, output_y, theta, phi, motor_angles = controller.update(ball, dt, uart)
             
             logging.info(
-                "Ball x=%.2f y=%.2f vx=%.2f vy=%.2f radius=%.2f error_x =%.2f error_y=%.2f output_x=%.2f output_y=%.2f theta=%.2f phi=%.2f motor_angles1=%.2f motor_angles2=%.2f motor_angles3=%.2f",
+                "Ball x=%.2f y=%.2f vx=%.2f vy=%.2f radius=%.2f scale=%.2f error_x =%.2f error_y=%.2f output_x=%.2f output_y=%.2f theta=%.2f phi=%.2f motor_angles1=%.2f motor_angles2=%.2f motor_angles3=%.2f",
                 ball["x"], ball["y"],
                 ball["vx"], ball["vy"],
                 ball["radius"],
+                ball["scale"],
                 error_x, error_y, 
                 output_x, output_y,
                 theta, phi,
