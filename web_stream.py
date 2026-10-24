@@ -352,13 +352,13 @@ async function resetParams() {
     if (!confirm("確定恢復初始控制參數？")) return;
 
     const defaults = {
-        kp: 0.03,
-        ki: 0.0,
-        kd: 0.006,
-        tilt_gain_x: 0.05,
-        tilt_gain_y: 0.05,
-        theta_limit: 0.08,
-        phi_limit: 0.08
+        "kp": 0.02,
+        "ki": 0.0,
+        "kd": 0.04,
+        "tilt_gain_x": 0.05,
+        "tilt_gain_y": 0.05,
+        "theta_limit": 0.1,
+        "phi_limit": 0.1,
     };
 
     try {

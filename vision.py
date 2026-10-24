@@ -49,7 +49,7 @@ class VISION():
             return 0.0, 0.0
 
         vx = (x1 - x0) / dt
-        vy = (y1 - y0) / dt
+        vy = -(y1 - y0) / dt
 
         return vx, vy
 

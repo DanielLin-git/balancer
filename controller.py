@@ -21,13 +21,13 @@ class CONTROLLER:
 
         # 所有可由網頁調整的參數
         self._params = {
-            "kp": 0.03,
+            "kp": 0.02,
             "ki": 0.0,
-            "kd": 0.006,
+            "kd": 0.04,
             "tilt_gain_x": 0.05,
             "tilt_gain_y": 0.05,
-            "theta_limit": 0.08,
-            "phi_limit": 0.08,
+            "theta_limit": 0.1,
+            "phi_limit": 0.1,
         }
 
         # 保護參數的讀寫，避免 Flask 和控制執行緒競爭
@@ -256,9 +256,9 @@ class CONTROLLER:
             self.integral_x = 0.0
             self.integral_y = 0.0
 
-        output_x = (params["kp"] * error_x+ params["ki"] * self.integral_x+ params["kd"] * ball_vx)
+        output_x = (params["kp"] * error_x+ params["ki"] * self.integral_x- params["kd"] * ball_vx)
 
-        output_y = (params["kp"] * error_y+ params["ki"] * self.integral_y+ params["kd"] * ball_vy)
+        output_y = (params["kp"] * error_y+ params["ki"] * self.integral_y- params["kd"] * ball_vy)
 
         theta_raw = -output_y * params["tilt_gain_x"]
         phi_raw = output_x * params["tilt_gain_y"]

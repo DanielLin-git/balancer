@@ -9,7 +9,7 @@ class CAMERA():
     def camera_setup(self):
         # 初始化 Picamera2
         self.picam2 = Picamera2()
-        self.picam2.configure(self.picam2.create_video_configuration(main={"size": (320, 240), "format": "RGB888"}))
+        self.picam2.configure(self.picam2.create_video_configuration(main={"size": (640, 480), "format": "RGB888"}))
         self.picam2.start()
 
     def get_frame(self):
