@@ -1,11 +1,12 @@
 import cv2
 import time
 import numpy as np
- 
+from collections import deque
+
 class VISION():
     def __init__(self):
         self.prev_time = None
-        self.prev_center = None
+        self.prev_position = None
 
         self.fps = 0.0
 
@@ -18,29 +19,46 @@ class VISION():
 
         self.ball_diameter = 40.0
 
+        self.vx_filtered = 0.0
+        self.vy_filtered = 0.0
+
+        self.velocity_tau = 0.04
+        self.max_velocity_dt = 0.15
+
+        self.position_history = deque(maxlen=5)
+
+    def calculate_velocity(self, x, y):
+        """
+        使用最近 5 筆位置計算平均速度。
+        x、y 的單位若為 mm，速度單位就是 mm/s。
+        """
+        now = time.perf_counter()
+
+        self.position_history.append((now, float(x), float(y)))
+
+        # 資料不足時，先不輸出速度
+        if len(self.position_history) < 5:
+            return 0.0, 0.0
+
+        t0, x0, y0 = self.position_history[0]
+        t1, x1, y1 = self.position_history[-1]
+
+        dt = t1 - t0
+
+        if dt <= 0:
+            return 0.0, 0.0
+
+        vx = (x1 - x0) / dt
+        vy = (y1 - y0) / dt
+
+        return vx, vy
+
     def recognition(self,frame):
 
-        # 4. 計算 時間差）
-        current_time = time.time()
-
-        if self.prev_time is None:
-            dt = None
-        else:
-            dt = current_time - self.prev_time
-
-        self.prev_time = current_time
-
-        #計算fps
-        if dt is not None and dt > 0:
-            instant_fps = 1.0 / dt
-            if self.fps == 0:
-                self.fps = instant_fps
-            else:
-                self.fps = 0.9 * self.fps + 0.1 * instant_fps
+        current_time = time.perf_counter()
 
         frame = cv2.flip(frame, 1)
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        HSV_image = cv2.cvtColor(frame_bgr, cv2.COLOR_RGB2HSV)
+        HSV_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(HSV_image , self.lower, self.upper)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, self.kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.kernel)
@@ -52,28 +70,28 @@ class VISION():
         center = None
 
         if contours:
-            # 找出最大面積的輪廓（假設畫面中最大的目標就是球）
             c = max(contours, key=cv2.contourArea)
-            
-            # 確保面積大於一個微小閾值，避免雜訊誤判
+
             if cv2.contourArea(c) > self.min_area:
-                # 計算最小外接圓
-                ((x, y), radius) = cv2.minEnclosingCircle(c)
+                (x, y), radius = cv2.minEnclosingCircle(c)
 
-                center = (int(x), int(y))
-                radius = float(radius)
+                if radius > 0:
+                    center = (float(x), float(y))
+                    radius = float(radius)
 
-                v_x = 0.0
-                v_y = 0.0
-                if self.prev_center is not None and dt>0:
-                    # 像素距離換算
-                    dx = (center[0] - self.prev_center[0])
-                    dy = (self.prev_center[1] - center[1])
+        if center is not None:
+            if self.prev_position is not None and self.prev_time is not None:
+                dt = current_time - self.prev_time
+
+                if 0 < dt <= self.max_velocity_dt:
+                    prev_x, prev_y = self.prev_position
                     
                     scale = self.ball_diameter / (2.0 * radius)
 
-                    v_x = dx / dt * scale
-                    v_y =  dy / dt * scale 
+                    vx, vy = self.calculate_velocity(x, y)
+
+                    v_x = vx * scale
+                    v_y =  vy * scale 
                     radius_mm = radius *scale
 
                     ball = {
@@ -86,29 +104,57 @@ class VISION():
                     }
 
                     cv2.circle(
-                        frame_bgr, center, int(radius),
+                        frame, (round(center[0]), round(center[1])),
+                        round(radius),
                         (0, 255, 0), 2
                     )
 
                     cv2.circle(
-                        frame_bgr, center, 3, (0, 0, 255), -1
+                        frame, (round(center[0]), round(center[1])),
+                        3, (0, 0, 255), -1
                     )
+                else:
+                    # 間隔過長：重設速度估測
+                    self.vx_filtered = 0.0
+                    self.vy_filtered = 0.0
+            # 只有成功偵測到球時才更新歷史資料
+            self.prev_position = center
+            self.prev_time = current_time
 
-        self.prev_center = center
+            cv2.circle(
+                frame, 
+                (round(center[0]), round(center[1])),
+                round(radius), (0, 255, 0), 2
+            )
 
-        height, width = frame_bgr.shape[:2]
+            cv2.circle(
+                frame,
+                (round(center[0]), round(center[1])),
+                3, (0, 0, 255), -1
+            )
+
+        else:
+            # 本幀未偵測到球：清除歷史資料，
+            # 下一次重新偵測時只建立新基準，不計算跨越失聯區間的速度。
+            self.prev_position = None
+            self.prev_time = None
+            self.vx_filtered = 0.0
+            self.vy_filtered = 0.0
+
+
+        height, width = frame.shape[:2]
 
         cv2.circle(
-            frame_bgr, (width // 2, height // 2),
+            frame, (width // 2, height // 2),
             3, (0, 255, 0), -1
         )
 
         cv2.putText(
-            frame_bgr,
+            frame,
             f"FPS: {self.fps:.1f}",
             (10, 25),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6, (0, 255, 0), 2
         )
 
-        return frame_bgr, ball
+        return frame, ball
