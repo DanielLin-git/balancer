@@ -21,11 +21,11 @@ class CONTROLLER:
 
         # 所有可由網頁調整的參數
         self._params = {
-            "kp": 0.02,
+            "kp": 0.07,
             "ki": 0.0,
-            "kd": 0.04,
-            "tilt_gain_x": 0.05,
-            "tilt_gain_y": 0.05,
+            "kd": 0.05,
+            "tilt_gain_x": 0.03,
+            "tilt_gain_y": 0.03,
             "theta_limit": 0.1,
             "phi_limit": 0.1,
         }

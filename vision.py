@@ -1,8 +1,7 @@
 import cv2
 import time
 import numpy as np
-from collections import deque
-
+ 
 class VISION():
     def __init__(self):
         self.prev_time = None
@@ -11,7 +10,7 @@ class VISION():
         self.fps = 0.0
 
         # 色彩空間轉換 (RGB 轉 BGR 給 OpenCV 辨識用)
-        self.lower = np.array([5, 100, 100])
+        self.lower = np.array([5, 100, 140])
         self.upper = np.array([25, 255, 255])
         self.kernel = np.ones((5, 5), np.uint8)
 
@@ -24,34 +23,6 @@ class VISION():
 
         self.velocity_tau = 0.04
         self.max_velocity_dt = 0.15
-
-        self.position_history = deque(maxlen=5)
-
-    def calculate_velocity(self, x, y):
-        """
-        使用最近 5 筆位置計算平均速度。
-        x、y 的單位若為 mm，速度單位就是 mm/s。
-        """
-        now = time.perf_counter()
-
-        self.position_history.append((now, float(x), float(y)))
-
-        # 資料不足時，先不輸出速度
-        if len(self.position_history) < 5:
-            return 0.0, 0.0
-
-        t0, x0, y0 = self.position_history[0]
-        t1, x1, y1 = self.position_history[-1]
-
-        dt = t1 - t0
-
-        if dt <= 0:
-            return 0.0, 0.0
-
-        vx = (x1 - x0) / dt
-        vy = -(y1 - y0) / dt
-
-        return vx, vy
 
     def recognition(self,frame):
 
@@ -86,12 +57,13 @@ class VISION():
                 if 0 < dt <= self.max_velocity_dt:
                     prev_x, prev_y = self.prev_position
                     
-                    scale = self.ball_diameter / (2.0 * radius)
+                    scale = self.ball_diameter / (2.0 * 36)
 
-                    vx, vy = self.calculate_velocity(x, y)
+                    dx = center[0] - prev_x
+                    dy = prev_y - center[1]
 
-                    v_x = vx * scale
-                    v_y =  vy * scale 
+                    v_x = dx / dt * scale
+                    v_y =  dy / dt * scale 
                     radius_mm = radius *scale
 
                     ball = {

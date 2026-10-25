@@ -95,7 +95,7 @@ def main():
                         ) = state
 
                         # 限制日誌頻率，避免 logging 影響控制迴圈
-                        if now - last_log_time >= 0.2:
+                        if now - last_log_time >= 0.03:
                             control_logger.info(
                                 "Ball x=%.2f y=%.2f "
                                 "vx=%.2f vy=%.2f "
