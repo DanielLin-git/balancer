@@ -110,7 +110,7 @@ class CONTROLLER:
 
     def motor_reset(self, uart: UART):
         for servo_id in (1, 2, 3):
-            self.send_angle_to_motor(uart, servo_id, 150.0)
+            self.send_angle_to_motor(uart, servo_id, 180.0)
 
     def motor_start(self, uart: UART):
         for servo_id in (1, 2, 3):
@@ -269,13 +269,14 @@ class CONTROLLER:
 
         motor_angles = self.kinema_inv(theta, phi, self.pz_ini)
 
+        
         if motor_angles is None:
             return None
-
+        
         # IK 成功後才送出命令
         for servo_id, angle in enumerate(motor_angles, start=1):
             self.send_angle_to_motor(uart, servo_id, angle)
-
+        
         state = {
             "error_x": error_x,
             "error_y": error_y,

@@ -84,42 +84,32 @@ def main():
 
                     # IK 無解時不解包，避免執行緒中斷
                     if state is not None:
-                        (
+                        (error_x,error_y,output_x,output_y,theta,phi,motor_angles,) = state
+                        
+                        control_logger.info(
+                            "Ball x=%.2f y=%.2f "
+                            "vx=%.2f vy=%.2f "
+                            "ex=%.2f ey=%.2f "
+                            "out_x=%.2f out_y=%.2f "
+                            "theta=%.4f phi=%.4f "
+                            "m1=%.2f m2=%.2f m3=%.2f dt=%.4f",
+                            ball["x"],
+                            ball["y"],
+                            ball["vx"],
+                            ball["vy"],
                             error_x,
                             error_y,
                             output_x,
                             output_y,
                             theta,
                             phi,
-                            motor_angles,
-                        ) = state
+                            motor_angles[0],
+                            motor_angles[1],
+                            motor_angles[2],
+                            dt,
+                        )
 
-                        # 限制日誌頻率，避免 logging 影響控制迴圈
-                        if now - last_log_time >= 0.03:
-                            control_logger.info(
-                                "Ball x=%.2f y=%.2f "
-                                "vx=%.2f vy=%.2f "
-                                "ex=%.2f ey=%.2f "
-                                "out_x=%.2f out_y=%.2f "
-                                "theta=%.4f phi=%.4f "
-                                "m1=%.2f m2=%.2f m3=%.2f dt=%.4f",
-                                ball["x"],
-                                ball["y"],
-                                ball["vx"],
-                                ball["vy"],
-                                error_x,
-                                error_y,
-                                output_x,
-                                output_y,
-                                theta,
-                                phi,
-                                motor_angles[0],
-                                motor_angles[1],
-                                motor_angles[2],
-                                dt,
-                            )
 
-                            last_log_time = now
 
                 # 即使沒有偵測到球，也繼續更新網頁影像
                 if result is not None:

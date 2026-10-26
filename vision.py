@@ -7,21 +7,24 @@ class VISION():
         self.prev_time = None
         self.prev_position = None
 
+        # 新增：濾波後的球心（像素座標）
+        self.filtered_position = None
+
+        # 新增：位置濾波時間常數
+        self.position_tau = 0.06
+
         self.fps = 0.0
 
         # 色彩空間轉換 (RGB 轉 BGR 給 OpenCV 辨識用)
         self.lower = np.array([5, 100, 140])
-        self.upper = np.array([25, 255, 255])
+        self.upper = np.array([20, 255, 255])
         self.kernel = np.ones((5, 5), np.uint8)
 
         self.min_area = 100
 
         self.ball_diameter = 40.0
 
-        self.vx_filtered = 0.0
-        self.vy_filtered = 0.0
 
-        self.velocity_tau = 0.04
         self.max_velocity_dt = 0.15
 
     def recognition(self,frame):
@@ -51,24 +54,44 @@ class VISION():
                     radius = float(radius)
 
         if center is not None:
-            if self.prev_position is not None and self.prev_time is not None:
+            
+            scale = self.ball_diameter / (2.0 * 36)
+
+            if self.filtered_position is None or self.prev_time is None:
+                self.filtered_position = center
+                self.prev_position = center
+                self.prev_time = current_time
+
+            else:
+                
                 dt = current_time - self.prev_time
 
                 if 0 < dt <= self.max_velocity_dt:
-                    prev_x, prev_y = self.prev_position
                     
-                    scale = self.ball_diameter / (2.0 * 36)
+                    
+                    alpha = 1.0 - np.exp(-dt / self.position_tau)
 
-                    dx = center[0] - prev_x
-                    dy = prev_y - center[1]
+                    old_fx, old_fy = self.filtered_position
+                    raw_x, raw_y = center
+
+                    filtered_x = old_fx + alpha * (raw_x - old_fx)
+                    filtered_y = old_fy + alpha * (raw_y - old_fy)
+
+                    self.filtered_position = (filtered_x, filtered_y)
+
+                    # 使用濾波後的位置計算速度
+                    prev_x, prev_y = self.prev_position
+
+                    dx = filtered_x - prev_x
+                    dy = prev_y - filtered_y
 
                     v_x = dx / dt * scale
                     v_y =  dy / dt * scale 
                     radius_mm = radius *scale
 
                     ball = {
-                        "x": (x - frame.shape[1] / 2)*scale,
-                        "y": (frame.shape[0] / 2 - y)*scale,
+                        "x": (filtered_x - frame.shape[1] / 2)*scale,
+                        "y": (frame.shape[0] / 2 - filtered_y)*scale,
                         "vx": v_x,
                         "vy": v_y,
                         "radius": radius_mm,
@@ -85,13 +108,10 @@ class VISION():
                         frame, (round(center[0]), round(center[1])),
                         3, (0, 0, 255), -1
                     )
-                else:
-                    # 間隔過長：重設速度估測
-                    self.vx_filtered = 0.0
-                    self.vy_filtered = 0.0
-            # 只有成功偵測到球時才更新歷史資料
-            self.prev_position = center
-            self.prev_time = current_time
+
+                    # 只有成功偵測到球時才更新歷史資料
+                    self.prev_position = (filtered_x, filtered_y)
+                    self.prev_time = current_time
 
             cv2.circle(
                 frame, 
@@ -106,12 +126,14 @@ class VISION():
             )
 
         else:
-            # 本幀未偵測到球：清除歷史資料，
-            # 下一次重新偵測時只建立新基準，不計算跨越失聯區間的速度。
-            self.prev_position = None
-            self.prev_time = None
+            # 間隔過長：重新建立基準
+            self.filtered_position = center
+            self.prev_position = center
+            self.prev_time = current_time
+
             self.vx_filtered = 0.0
             self.vy_filtered = 0.0
+
 
 
         height, width = frame.shape[:2]
